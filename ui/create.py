@@ -208,25 +208,49 @@ def _irr_step3():
     piece_label = piece_info.get("descripcion_visual") or active
     st.markdown(f"**Paso 3: Lados y conexiones — {active} — {piece_label}**")
 
+    # Perfiles ya usados en cualquier lado de la sesión
+    existing_profiles = sorted(set(
+        s["perfil"] for s in st.session_state.irr_sides
+        if s.get("perfil") and s["perfil"] not in ("", "plano", "sin_perfil")
+    ))
+
     with st.form("irr_add_side", clear_on_submit=True):
         orientacion = st.selectbox("Orientación", ["norte", "sur", "este", "oeste"])
         forma = st.selectbox("Forma", ["plano", "macho", "hembra"])
-        perfil = st.text_input("Perfil", placeholder="curva_A")
+
+        perfil_options = ["-- Nuevo --"] + existing_profiles
+        perfil_choice = st.selectbox("Perfil (reutilizar existente)", perfil_options)
+        perfil_nuevo = st.text_input("Nuevo perfil", placeholder="ej: curva_A, tab_recto",
+                                     help='Solo si elegiste "-- Nuevo --" arriba')
         add_side_btn = st.form_submit_button("Agregar lado")
 
     if add_side_btn:
-        side_id = f"{active}_{orientacion[0].upper()}"
-        if any(s["id"] == side_id for s in st.session_state.irr_sides):
-            st.warning(f"Ya existe el lado {orientacion} para esta pieza.")
-        else:
-            st.session_state.irr_sides.append({
-                "id": side_id,
-                "piece_id": active,
-                "orientacion": orientacion,
-                "forma": forma,
-                "perfil": perfil.strip() or "sin_perfil",
-            })
-            st.rerun()
+        perfil_final = (perfil_nuevo.strip() if perfil_choice == "-- Nuevo --"
+                        else perfil_choice) or "sin_perfil"
+        # Permitir múltiples lados por orientación — ID con contador
+        same_ori = [s for s in st.session_state.irr_sides
+                    if s["piece_id"] == active and s["orientacion"] == orientacion]
+        n = len(same_ori) + 1
+        side_id = f"{active}_{orientacion[0].upper()}{n}"
+        st.session_state.irr_sides.append({
+            "id": side_id,
+            "piece_id": active,
+            "orientacion": orientacion,
+            "forma": forma,
+            "perfil": perfil_final,
+        })
+        st.rerun()
+
+    # Instrucción de ejemplo con el perfil
+    st.markdown(
+        '<div style="background:#FEF3C7;border-left:3px solid #D97706;padding:8px 12px;'
+        'border-radius:0 6px 6px 0;font-size:0.85em;color:#92400E;margin-top:4px">'
+        '<strong>¿Cómo aparece el perfil en las instrucciones?</strong><br>'
+        'Conéctala por su lado <strong>este →</strong> — busca <em>"curva_A"</em> '
+        'al lado <strong>oeste ←</strong> de "Nube viajera".'
+        '</div>',
+        unsafe_allow_html=True
+    )
 
     sides_for_piece = [s for s in st.session_state.irr_sides if s["piece_id"] == active]
     if sides_for_piece:
@@ -244,7 +268,7 @@ def _irr_step3():
             perfil = s.get("perfil", "")
             perfil_str = f' · {perfil}' if perfil not in ("", "plano", "sin_perfil") else ""
             pieza_nombre = piece_map.get(s['piece_id'], s['piece_id'])
-            return f"{pieza_nombre} — {s['orientacion']} ({s['forma']}{perfil_str})"
+            return f"{pieza_nombre} — {s['orientacion']} ({s['forma']}{perfil_str}) [{s['id']}]"
 
         side_labels = {s["id"]: _side_label(s) for s in all_sides}
         label_to_id = {v: k for k, v in side_labels.items()}
