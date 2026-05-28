@@ -5,6 +5,26 @@ from main import bfs_assemble
 
 def render_solve():
     st.header("Resolver rompecabezas")
+
+    with st.expander("🧭 ¿Qué es norte, sur, este y oeste?", expanded=False):
+        st.markdown("""
+Cada pieza física tiene **una flecha marcada** que indica su norte. Antes de empezar:
+
+> **Define tu norte:** elige una dirección en tu mesa (por ejemplo, hacia la pared del frente) y mantenla fija durante todo el armado.
+
+Con eso definido, cada pieza siempre se coloca con su flecha apuntando a ese norte. Las instrucciones usan los 4 puntos cardinales así:
+
+| Símbolo | Dirección | En la pieza |
+|---|---|---|
+| ↑ Norte | Hacia tu norte | Borde de arriba |
+| ↓ Sur | Opuesto a tu norte | Borde de abajo |
+| → Este | A tu derecha | Borde derecho |
+| ← Oeste | A tu izquierda | Borde izquierdo |
+
+**Ejemplo:** *"Conéctala por su lado este → al lado oeste ← de 'Cielo centro'"* significa: toma el borde derecho de la pieza nueva y encájalo con el borde izquierdo de la pieza que ya está colocada.
+        """)
+        st.divider()
+
     driver = get_driver()
 
     with driver.session() as session:
@@ -49,18 +69,23 @@ def render_solve():
     cols = st.columns(3)
     for i, p in enumerate(available_pieces):
         with cols[i % 3]:
-            label = f"`{p['id']}`\n{p.get('nombre') or p['tipo']}"
+            nombre = p.get('nombre') or p['id']
+            label = f"{p['id']} — {nombre}"
             if st.checkbox(label, key=f"miss_{puzzle_id}_{p['id']}"):
                 extra_missing.add(p["id"])
 
     st.divider()
-    start_options = [p["id"] for p in available_pieces if p["id"] not in extra_missing]
+    start_map = {
+        f"{p['id']} — {p.get('nombre') or p['id']}": p["id"]
+        for p in available_pieces if p["id"] not in extra_missing
+    }
 
-    if not start_options:
+    if not start_map:
         st.warning("No hay piezas disponibles para iniciar el BFS.")
         return
 
-    start_piece = st.selectbox("Pieza inicial", start_options)
+    start_label = st.selectbox("Pieza inicial", list(start_map.keys()))
+    start_piece = start_map[start_label]
 
     if st.button("▶ Resolver", use_container_width=True):
         with driver.session() as session:

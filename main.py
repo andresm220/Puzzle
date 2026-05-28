@@ -37,6 +37,10 @@ def get_available_neighbors(session, piece_id: str, visited: set, extra_missing:
               <-[:HAS_SIDE]-(neighbor:Piece {available: true})
         WHERE NOT neighbor.id IN $visited
           AND NOT neighbor.id IN $extraMissing
+          AND (
+            (mySide.forma = 'macho' AND theirSide.forma = 'hembra') OR
+            (mySide.forma = 'hembra' AND theirSide.forma = 'macho')
+          )
         RETURN neighbor.id                    AS pieza,
                neighbor.tipo                 AS tipo,
                neighbor.descripcion_visual   AS nombre,
@@ -67,11 +71,11 @@ def get_missing_neighbors(session, piece_id: str) -> list:
     return [r["pieza_faltante"] for r in records]
 
 
-_DIRS = {
-    "norte": "SUPERIOR ↑",
-    "sur":   "INFERIOR ↓",
-    "este":  "DERECHO →",
-    "oeste": "IZQUIERDO ←",
+_LADO = {
+    "norte": "norte ↑",
+    "sur":   "sur ↓",
+    "este":  "este →",
+    "oeste": "oeste ←",
 }
 
 
@@ -82,21 +86,19 @@ def format_step(step_num: int, data: dict, is_first: bool = False) -> str:
     if is_first:
         return (
             f"Paso {step_num} — PIEZA INICIAL\n"
-            f"  ① Busca la pieza {pieza_label} y tómala.\n"
-            f"  ② Colócala en la mesa con la imagen mirando hacia adelante (como en la caja).\n"
-            f"  ③ Este es tu punto de partida. Las demás piezas se conectarán a esta."
+            f"  ① Toma la pieza {pieza_label}.\n"
+            f"  ② Oriéntala con su flecha apuntando hacia tu norte.\n"
+            f"  ③ Colócala en la mesa. Este es tu punto de partida."
         )
 
-    su_lado = _DIRS.get(data["orientacion_requerida"], data["orientacion_requerida"].upper())
-    lado_ya_puesta = _DIRS.get(data["conecta_con_lado"], data["conecta_con_lado"].upper())
+    su_lado = _LADO.get(data["orientacion_requerida"], data["orientacion_requerida"])
+    lado_ya_puesta = _LADO.get(data["conecta_con_lado"], data["conecta_con_lado"])
     mi_nombre = data.get("mi_nombre") or data["mi_pieza"]
 
     return (
         f"Paso {step_num}\n"
-        f'  ① Busca la pieza {pieza_label} y tómala.\n'
-        f"  ② Oriéntala con la imagen correcta (borde superior apuntando hacia adelante).\n"
-        f'  ③ Encájala por su borde {su_lado} con el borde {lado_ya_puesta} de '
-        f'la pieza "{mi_nombre}" que ya está en su lugar.'
+        f'  ① Toma la pieza {pieza_label} y oriéntala con su flecha apuntando a tu norte.\n'
+        f'  ② Conéctala por su lado {su_lado} al lado {lado_ya_puesta} de "{mi_nombre}".'
     )
 
 
