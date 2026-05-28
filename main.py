@@ -96,7 +96,9 @@ def format_step(step_num: int, data: dict, is_first: bool = False) -> str:
     lado_ya_puesta = _LADO.get(data["conecta_con_lado"], data["conecta_con_lado"])
     mi_nombre = data.get("mi_nombre") or data["mi_pieza"]
     perfil = data.get("perfil") or ""
-    perfil_util = perfil not in ("", "plano", "sin_perfil")
+    perfil_util = (perfil not in ("", "plano", "sin_perfil")
+                   and not perfil.startswith("V_")
+                   and not perfil.startswith("H_"))
     perfil_hint = f' — busca "{perfil}"' if perfil_util else ""
 
     return (

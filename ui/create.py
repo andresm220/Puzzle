@@ -256,7 +256,15 @@ def _irr_step3():
     if sides_for_piece:
         st.markdown("**Lados de esta pieza:**")
         for s in sides_for_piece:
-            st.write(f"{s['id']} — {s['orientacion']} | {s['forma']} | {s['perfil']}")
+            col_info, col_del = st.columns([5, 1])
+            perfil_str = f' · {s["perfil"]}' if s["perfil"] not in ("", "plano", "sin_perfil") else ""
+            col_info.write(f"{s['id']} — {s['orientacion']} | {s['forma']}{perfil_str}")
+            if col_del.button("🗑", key=f"del_side_{s['id']}"):
+                # Eliminar el lado y todas sus conexiones
+                st.session_state.irr_sides = [x for x in st.session_state.irr_sides if x["id"] != s["id"]]
+                st.session_state.irr_fits = [f for f in st.session_state.irr_fits
+                                             if f["from"] != s["id"] and f["to"] != s["id"]]
+                st.rerun()
 
     all_sides = st.session_state.irr_sides
     if len(all_sides) >= 2:
