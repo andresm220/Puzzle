@@ -17,7 +17,7 @@ def validate_inputs(session, puzzle_id: str, piece_id: str) -> None:
         sys.exit(1)
 
     result = list(session.run(
-        "MATCH (pc:Piece {id: $id, puzzle_id: $puzzle_id}) RETURN pc.available AS available",
+        "MATCH (pz:Puzzle {id: $puzzle_id})-[:HAS_PIECE]->(pc:Piece {id: $id}) RETURN pc.available AS available",
         id=piece_id, puzzle_id=puzzle_id
     ))
     if not result:
@@ -41,6 +41,7 @@ def get_available_neighbors(session, piece_id: str, visited: set, extra_missing:
             (mySide.forma = 'macho' AND theirSide.forma = 'hembra') OR
             (mySide.forma = 'hembra' AND theirSide.forma = 'macho')
           )
+          AND mySide.perfil = theirSide.perfil
         RETURN neighbor.id                    AS pieza,
                neighbor.tipo                 AS tipo,
                neighbor.descripcion_visual   AS nombre,
@@ -94,11 +95,14 @@ def format_step(step_num: int, data: dict, is_first: bool = False) -> str:
     su_lado = _LADO.get(data["orientacion_requerida"], data["orientacion_requerida"])
     lado_ya_puesta = _LADO.get(data["conecta_con_lado"], data["conecta_con_lado"])
     mi_nombre = data.get("mi_nombre") or data["mi_pieza"]
+    perfil = data.get("perfil") or ""
+    perfil_util = perfil not in ("", "plano", "sin_perfil")
+    perfil_hint = f' — busca "{perfil}"' if perfil_util else ""
 
     return (
         f"Paso {step_num}\n"
         f'  ① Toma la pieza {pieza_label} y oriéntala con su flecha apuntando a tu norte.\n'
-        f'  ② Conéctala por su lado {su_lado} al lado {lado_ya_puesta} de "{mi_nombre}".'
+        f'  ② Conéctala por su lado {su_lado}{perfil_hint} al lado {lado_ya_puesta} de "{mi_nombre}".'
     )
 
 
@@ -138,11 +142,29 @@ def list_pieces(session, puzzle_id: str) -> None:
         print(f"{r['id']:<16} {r['tipo']:<12} {mark}")
 
 
+def get_bridge_missing(session, piece_id: str, missing_ids: set) -> list:
+    """Returns missing pieces that directly connect to piece_id."""
+    if not missing_ids:
+        return []
+    records = session.run(
+        """
+        MATCH (target:Piece {id: $pid})-[:HAS_SIDE]->(ts:Side)
+              -[:FITS_INTO {correct: true}]-(ms:Side)
+              <-[:HAS_SIDE]-(missing:Piece)
+        WHERE missing.id IN $missing_ids
+        RETURN DISTINCT missing.id AS id, missing.descripcion_visual AS nombre
+        """,
+        pid=piece_id,
+        missing_ids=list(missing_ids)
+    )
+    return [{"id": r["id"], "nombre": r["nombre"] or r["id"]} for r in records]
+
+
 def bfs_assemble(session, puzzle_id: str, start_piece_id: str, extra_missing: set = None) -> dict:
     extra_missing = extra_missing or set()
 
     all_pieces = list(session.run(
-        "MATCH (pc:Piece {puzzle_id: $puzzle_id}) RETURN pc.id AS id, pc.available AS available",
+        "MATCH (pz:Puzzle {id: $puzzle_id})-[:HAS_PIECE]->(pc:Piece) RETURN pc.id AS id, pc.available AS available",
         puzzle_id=puzzle_id
     ))
     total = len(all_pieces)
@@ -160,17 +182,20 @@ def bfs_assemble(session, puzzle_id: str, start_piece_id: str, extra_missing: se
 
         steps = []
         queue = deque([start])
-        tipo_result = list(session.run(
-            "MATCH (pc:Piece {id: $id}) RETURN pc.tipo AS tipo, pc.descripcion_visual AS nombre",
+        start_info = list(session.run(
+            "MATCH (pc:Piece {id: $id}) RETURN pc.descripcion_visual AS nombre",
             id=start
         ))
-        if not tipo_result:
+        if not start_info:
             continue
+
+        start_nombre = start_info[0].get("nombre") or start
+        is_first_island = len(islands) == 0
 
         visited.add(start)
         steps.append(format_step(1, {
-            "pieza": start, "tipo": tipo_result[0]["tipo"],
-            "nombre": tipo_result[0].get("nombre") or "",
+            "pieza": start,
+            "nombre": start_nombre,
             "orientacion_requerida": None, "forma": None,
             "perfil": None, "conecta_con_lado": None, "mi_pieza": None,
         }, is_first=True))
@@ -187,7 +212,22 @@ def bfs_assemble(session, puzzle_id: str, start_piece_id: str, extra_missing: se
                     steps.append(format_step(len(steps) + 1, neighbor))
                     queue.append(pid)
 
-        islands.append({"label": f"Isla {len(islands) + 1}", "steps": steps})
+        # Find which missing pieces caused this island to be disconnected
+        bridge_pieces = [] if is_first_island else get_bridge_missing(session, start, missing_found)
+
+        if is_first_island:
+            label = "Sección principal"
+        elif bridge_pieces:
+            nombres = ", ".join(f'"{p["nombre"]}"' for p in bridge_pieces)
+            label = f"Sección separada — continúa aquí porque {nombres} no {'está' if len(bridge_pieces) == 1 else 'están'} disponible{'s' if len(bridge_pieces) > 1 else ''}"
+        else:
+            label = f"Sección separada — continúa aquí (desconectada del resto)"
+
+        islands.append({
+            "label": label,
+            "steps": steps,
+            "bridge_missing": bridge_pieces,
+        })
 
     unreachable = sorted(available_ids - visited)
 

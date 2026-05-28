@@ -96,6 +96,14 @@ Con eso definido, cada pieza siempre se coloca con su flecha apuntando a ese nor
 
         for island in result["islands"]:
             if len(result["islands"]) > 1:
+                bridge = island.get("bridge_missing", [])
+                if bridge:
+                    nombres = ", ".join(f'<strong>{p["nombre"]}</strong>' for p in bridge)
+                    st.markdown(
+                        f'<div class="missing-card">⚠ La pieza {nombres} no está disponible — '
+                        f'el armado se divide aquí. Continúa con la siguiente sección.</div>',
+                        unsafe_allow_html=True
+                    )
                 st.markdown(f"#### 🧩 {island['label']}")
             for step in island["steps"]:
                 st.markdown(f'<div class="step-card">{step}</div>', unsafe_allow_html=True)

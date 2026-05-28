@@ -167,6 +167,16 @@ def _irr_step2():
                 color = "#14532D"
                 bg = "#F0FDF4"
 
+            # Sides with perfil
+            sides_html = ""
+            for s in lados:
+                perfil = s.get("perfil", "")
+                perfil_str = f' · <em>{perfil}</em>' if perfil not in ("", "plano", "sin_perfil") else ""
+                sides_html += (
+                    f'<div style="color:#475569;font-size:0.82em;margin-top:2px;padding-left:8px">'
+                    f'{s["orientacion"]} — {s["forma"]}{perfil_str}</div>'
+                )
+
             conns_html = "".join(
                 f'<div style="color:#475569;font-size:0.82em;margin-top:2px;padding-left:8px">{line}</div>'
                 for line in conn_lines
@@ -178,6 +188,7 @@ def _irr_step2():
                 f'<strong style="color:#1E293B">{nombre}</strong> '
                 f'<span style="color:#64748B;font-size:0.85em">{pid}</span><br>'
                 f'<span style="color:{color};font-size:0.85em">{estado}</span>'
+                f'{sides_html}'
                 f'{conns_html}'
                 f'</div>',
                 unsafe_allow_html=True
@@ -229,10 +240,13 @@ def _irr_step3():
         st.markdown("**Conectar lados (FITS_INTO)**")
         piece_map = {p["id"]: p.get("descripcion_visual") or p["id"]
                      for p in st.session_state.irr_pieces}
-        side_labels = {
-            s["id"]: f"{s['id']} ({piece_map.get(s['piece_id'], s['piece_id'])} — {s['orientacion']})"
-            for s in all_sides
-        }
+        def _side_label(s):
+            perfil = s.get("perfil", "")
+            perfil_str = f' · {perfil}' if perfil not in ("", "plano", "sin_perfil") else ""
+            pieza_nombre = piece_map.get(s['piece_id'], s['piece_id'])
+            return f"{pieza_nombre} — {s['orientacion']} ({s['forma']}{perfil_str})"
+
+        side_labels = {s["id"]: _side_label(s) for s in all_sides}
         label_to_id = {v: k for k, v in side_labels.items()}
         side_options = list(side_labels.values())
         with st.form("irr_connect", clear_on_submit=True):

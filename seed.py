@@ -90,7 +90,7 @@ def to_cypher_string(data: dict) -> str:
         avail = "true" if pc["available"] else "false"
         lines.append(
             f"MERGE (pc:Piece {{id: '{_esc(pc['id'])}'}}) "
-            f"SET pc.puzzle_id = '{_esc(pc['puzzle_id'])}', pc.tipo = '{_esc(pc['tipo'])}', "
+            f"SET pc.tipo = '{_esc(pc['tipo'])}', "
             f"pc.descripcion_visual = '{_esc(pc['descripcion_visual'])}', pc.available = {avail};"
         )
         lines.append(
@@ -102,7 +102,7 @@ def to_cypher_string(data: dict) -> str:
         perfil = s["perfil"] or "plano"
         lines.append(
             f"MERGE (s:Side {{id: '{_esc(s['id'])}'}}) "
-            f"SET s.piece_id = '{_esc(s['piece_id'])}', s.orientacion = '{_esc(s['orientacion'])}', "
+            f"SET s.orientacion = '{_esc(s['orientacion'])}', "
             f"s.forma = '{_esc(forma)}', s.perfil = '{_esc(perfil)}';"
         )
         lines.append(
@@ -127,9 +127,9 @@ def load_to_neo4j(driver, data: dict) -> None:
         for pc in data["pieces"]:
             session.run(
                 "MERGE (pc:Piece {id: $id}) "
-                "SET pc.puzzle_id = $puzzle_id, pc.tipo = $tipo, "
+                "SET pc.tipo = $tipo, "
                 "pc.descripcion_visual = $desc, pc.available = $available",
-                id=pc["id"], puzzle_id=pc["puzzle_id"], tipo=pc["tipo"],
+                id=pc["id"], tipo=pc["tipo"],
                 desc=pc["descripcion_visual"], available=pc["available"]
             )
             session.run(
@@ -142,9 +142,9 @@ def load_to_neo4j(driver, data: dict) -> None:
             perfil = s["perfil"] or "plano"
             session.run(
                 "MERGE (s:Side {id: $id}) "
-                "SET s.piece_id = $piece_id, s.orientacion = $orientacion, "
+                "SET s.orientacion = $orientacion, "
                 "s.forma = $forma, s.perfil = $perfil",
-                id=s["id"], piece_id=s["piece_id"], orientacion=s["orientacion"],
+                id=s["id"], orientacion=s["orientacion"],
                 forma=forma, perfil=perfil
             )
             session.run(
